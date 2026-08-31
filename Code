@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classroom Picker</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f3f4f6; color: #333; overflow-x: hidden; }
+        h1 { margin-bottom: 5px; color: #1e3a8a; }
+        .container { display: flex; flex-direction: column; align-items: center; position: relative; }
+        .wheel-outer { position: relative; width: 380px; height: 380px; margin: 25px; }
+        .pointer { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 35px solid #ef4444; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        canvas { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        button { padding: 14px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #2563eb; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: background 0.2s; }
+        button:hover { background-color: #1d4ed8; }
+        button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+        .secret-trigger { position: fixed; bottom: 5px; right: 5px; width: 20px; height: 20px; background: transparent; cursor: pointer; z-index: 999; }
+        .secret-panel { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); z-index: 1000; width: 340px; max-height: 80vh; overflow-y: auto; }
+        .item-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .name-input { flex: 2; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        .weight-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 50px; }
+        .del-btn { background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+        .add-btn { background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; width: 100%; }
+        .close-btn { background: #4b5563; padding: 10px; font-size: 15px; margin-top: 15px; width: 100%; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .result-banner { margin-top: 20px; font-size: 26px; font-weight: bold; color: #059669; min-height: 35px; }
+    </style>
+</head>
+<body>
+    <h1>Classroom Picker</h1>
+    <p>Click spin to pick an option!</p>
+    <div class="container">
+        <div class="wheel-outer"><div class="pointer"></div><canvas id="wheelCanvas" width="500" height="500"></canvas></div>
+        <button id="spinBtn">SPIN WHEEL</button>
+        <div id="result" class="result-banner"></div>
+    </div>
+    <div id="secretTrigger" class="secret-trigger"></div>
+    <div id="secretPanel" class="secret-panel">
+        <h3 style="margin-top:0; color:#dc2626; margin-bottom:5px;">Wheel Customisation</h3>
+        <p style="font-size:12px; color:#666; margin-bottom:15px;">Change names, remove slices, or adjust hidden odds. Layout sizes stay equal.</p>
+        <div id="itemsContainer"></div>
+        <button class="add-btn" id="addItemBtn">+ Add New Slice</button>
+        <button class="close-btn" id="closePanelBtn">Save & Refresh Wheel</button>
+    </div>
+
+    <script>
+        let items = [
+            { name: "Option 1", weight: 1, color: "#3b82f6" },
+            { name: "Option 2", weight: 1, color: "#10b981" },
+            { name: "Option 3", weight: 1, color: "#f59e0b" },
+            { name: "Option 4", weight: 1, color: "#ef4444" },
+            { name: "Option 5", weight: 1, color: "#8b5cf6" },
+            { name: "Option 6", weight: 1, color: "#ec4899" }
+        ];
+        const presetColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f43f5e"];
+        let isSpinning = false;
+        let currentDegrees = 0;
+
+        const canvas = document.getElementById("wheelCanvas");
+        const ctx = canvas.getContext("2d");
+        const spinBtn = document.getElementById("spinBtn");
+        const resultDiv = document.getElementById("result");
+        const secretTrigger = document.getElementById("secretTrigger");
+        const secretPanel = document.getElementById("secretPanel");
+        const itemsContainer = document.getElementById("itemsContainer");
+        const addItemBtn = document.getElementById("addItemBtn");
+        const closePanelBtn = document.getElementById("closePanelBtn");
+
+        function drawWheel() {
+            const numSegments = items.length;
+            if (numSegments === 0) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+            const arcSize = (2 * Math.PI) / numSegments;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < numSegments; i++) {
+                const angle = i * arcSize;
+                ctx.beginPath(); ctx.fillStyle = items[i].color; ctx.moveTo(250, 250); ctx.arc(250, 250, 250, angle, angle + arcSize); ctx.lineTo(250, 250); ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
+                ctx.save(); ctx.translate(250, 250); ctx.rotate(angle + arcSize / 2); ctx.textAlign = "right"; ctx.fillStyle = "#ffffff"; ctx.font = "bold 18px sans-serif"; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 4;
+                let displayName = items[i].name; if (displayName.length > 15) displayName = displayName.substring(0,12) + "...";
+                ctx.fillText(displayName, 230, 6); ctx.restore();
+            }
+        }
+
+        function pickWeightedWinner() {
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            if (totalWeight <= 0) return Math.floor(Math.random() * items.length);
+            let random = Math.random() * totalWeight;
+            for (let i = 0; i < items.length; i++) { if (random < items[i].weight) return i; random -= items[i].weight; }
+            return 0;
+        }
+
+        function spinWheel() {
+            if (isSpinning || items.length === 0) return;
+            isSpinning = true; spinBtn.disabled = true; resultDiv.innerText = "";
+            const winnerIndex = pickWeightedWinner();
+            const numSegments = items.length;
+            const segmentArc = 360 / numSegments;
+            const targetAngleInSegment = segmentArc / 2;
+            const degreesToCenterWinner = 270 - (winnerIndex * segmentArc) - targetAngleInSegment;
+            const baseSpins = 360 * (14 + Math.floor(Math.random() * 5));
+            const finalRotation = baseSpins + degreesToCenterWinner;
+            const duration = 6000; const startTimestamp = performance.now();
+            
+            function animate(now) {
+                const elapsed = now - startTimestamp; const progress = Math.min(elapsed / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 4); currentDegrees = easeOut * finalRotation;
+                canvas.style.transform = `rotate(${currentDegrees}deg)`;
+                if (progress < 1) { requestAnimationFrame(animate); } else { isSpinning = false; spinBtn.disabled = false; resultDiv.innerText = `Result: ${items[winnerIndex].name}`; }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        function renderManagementUI() {
+            itemsContainer.innerHTML = "";
+            items.forEach((item, idx) => {
+                const row = document.createElement("div"); row.className = "item-row";
+                row.innerHTML = `<input type="text" class="name-input" value="${item.name}" placeholder="Name" data-idx="${idx}" data-field="name"><input type="number" class="weight-input" min="0" value="${item.weight}" placeholder="Odds" data-idx="${idx}" data-field="weight"><button class="del-btn" data-idx="${idx}">✕</button>`;
+                itemsContainer.appendChild(row);
+            });
+            document.querySelectorAll('.name-input, .weight-input').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const idx = e.target.getAttribute('data-idx'); const field = e.target.getAttribute('data-field');
+                    if (field === 'name') { items[idx].name = e.target.value; } else if (field === 'weight') { items[idx].weight = parseFloat(e.target.value) || 0; }
+                });
+            });
+            document.querySelectorAll('.del-btn').forEach(btn => { btn.addEventListener('click', (e) => { const idx = parseInt(e.target.getAttribute('data-idx')); items.splice(idx, 1); renderManagementUI(); }); });
+        }
+
+        function addNewSlice() { const nextColor = presetColors[items.length % presetColors.length]; items.push({ name: `Option ${items.length + 1}`, weight: 1, color: nextColor }); renderManagementUI(); }
+        function togglePanel() { if (secretPanel.style.display === "block") { secretPanel.style.display = "none"; drawWheel(); } else { renderManagementUI(); secretPanel.style.display = "block"; } }
+        
+        spinBtn.addEventListener('click', spinWheel); secretTrigger.addEventListener('click', togglePanel); closePanelBtn.addEventListener('click', togglePanel); addItemBtn.addEventListener('click', addNewSlice);
+        drawWheel();
+    </script>
+</body>
+</html>
